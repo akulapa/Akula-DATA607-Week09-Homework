@@ -1,0 +1,280 @@
+---
+title: "Web APIs"
+author: "Pavan Akula"
+date: "March 31, 2017"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+###DATA607-Week09 - Assignment
+
+The purpose of this assignment is to connect to NYTimes.com website, extract information and store into R data frame for analysis. According to NYTimes.com developer [FAQ](http://developer.nytimes.com/faq) more API's may be released over time. Following are the steps:
+
+1. Get an API Key from the website http://developer.nytimes.com/signup.
+2. Select an API to extract data.
+3. Data extraction and storage.
+4. Data analysis.
+
+Libraries used
+```{r, message=F}
+library(urltools)
+library(jsonlite)
+library(knitr)
+library(dplyr)
+library(stringr)
+library(ggplot2)
+```
+
+####Get an API Key from the website
+Open [NYTimes Create a New API Key](http://developer.nytimes.com/signup) web page and key in all the required information and click on [Create API Key.](http://developer.nytimes.com/signup) NYTimes will send an alpha-numeric key to the email address.
+
+####Select an API to extract data
+Once API Key is acquired, validate it by visiting web page http://developer.nytimes.com/. Pick any topic of your choice and follow the instructions.
+
+For the purpose of the assignment, I have picked two API's "Most Popular API" and "Article Search API".
+
+#####Most Popular API
+With the Most Popular API, you can get links and metadata for the blog posts and articles that are most frequently e-mailed, shared and viewed by NYTimes.com readers. Parameter accepted by this API are "section" and "time-period" Additional information can be found at http://developer.nytimes.com/most_popular_api_v2.json#/README.
+
+Allowed values for the section:
+
+- Arts
+- Automobiles
+- Blogs
+- Books
+- Business Day
+- Education
+- Fashion & Style
+- Food
+- Health
+- Job Market
+- Magazine
+- membercenter
+- Movies
+- Multimedia
+- N.Y.%20%2F%20Region
+- NYT Now
+- Obituaries
+- Open
+- Opinion
+- Public Editor
+- Real Estate
+- Science
+- Sports
+- Style
+- Sunday Review
+- T Magazine
+- Technology
+- The Upshot
+- Theater
+- Times Insider
+- Today's Paper
+- Travel
+- U.S.
+- World
+- Your Money
+- all-sections
+
+Allowed values for time-period (represents days):
+
+- 1
+- 7
+- 30
+
+```{r, echo=T}
+#URL formation
+#Base URL
+nyt.base.url <- "https://api.nytimes.com/svc/mostpopular/v2/"
+
+#Second part, path changes based on path, section, and time-period
+#{mostemailed | mostshared | mostviewed}
+
+#Possible paths
+nyt.path <- data.frame(DisplayText=NA,UrlPath=NA)
+nyt.path <- rbind(nyt.path, c("Most Emailed","mostemailed"))
+nyt.path <- rbind(nyt.path, c("Most Shared","mostshared"))
+nyt.path <- rbind(nyt.path, c("Most Viewed","mostviewed"))
+nyt.path <- na.omit(nyt.path)
+
+#Possible sections
+nyt.sec<- c("Arts","Automobiles","Blogs","Books","Business Day","Education","Fashion & Style","Food","Health","Job Market","Magazine","membercenter","Movies","Multimedia","N.Y.%20%2F%20Region","NYT Now","Obituaries","Open","Opinion","Public Editor","Real Estate","Science","Sports","Style","Sunday Review","T Magazine","Technology","The Upshot","Theater","Times Insider","Today's Paper","Travel","U.S.","World","Your Money","all-sections")
+
+#Possible time-period
+nyt.time <- data.frame(DisplayText=NA,TimePath=NA)
+nyt.time <- rbind(nyt.time, c("1 day","1.json"))
+nyt.time <- rbind(nyt.time, c("7 days","7.json"))
+nyt.time <- rbind(nyt.time, c("30 days","30.json"))
+nyt.time <- na.omit(nyt.time)
+
+nyt.path.data.frame <- data.frame(Path=NA,NYTUrl=NA)
+#loop through path
+for (p in 1:nrow(nyt.path)){
+  #loop through sections
+  for(s in 1:length(nyt.sec)){
+    #loop through time
+    for (t in 1:nrow(nyt.time)){
+      
+      # Generate complete URL
+      nyt.complete.url <- paste0(nyt.base.url, nyt.path$UrlPath[p], "/", nyt.sec[s], "/", nyt.time$TimePath[t])
+      
+      #Attach API Key
+      nyt.complete.url <- param_set(nyt.complete.url, key = "api-key", value = "a8a7bea8b95f4ef986e504ec99287013")
+      
+      nyt.complete.url <- URLencode(nyt.complete.url) #Converts spaces and special characters to URL format
+      
+      #Save the URL
+      nyt.url.info <- paste0(nyt.path$DisplayText[p]," by ", nyt.sec[s], " in ", nyt.time$DisplayText[t])
+      nyt.path.data.frame <- rbind(nyt.path.data.frame, c(nyt.url.info, nyt.complete.url))
+    }
+  }
+}
+
+nyt.path.data.frame <- na.omit(nyt.path.data.frame)
+row.names(nyt.path.data.frame) <- NULL
+
+set.seed(125)
+nyt.path.data.sample <- nyt.path.data.frame %>% sample_n(., 10) 
+row.names(nyt.path.data.sample) <- NULL
+
+kable(nyt.path.data.sample, format="pandoc", align="l", col.names = c("Path","NYTUrl"), row.names = NA,caption = "Sample list of URL's for *_NYTimes.com Most Popular API_*")
+
+```
+
+#####Article Search API
+You can get useful results from the Article Search API with a simple query. But you can also use filters and facets to extend the functionality of the API. Additional information on filters and sorting can be found at http://developer.nytimes.com/article_search_v2.json#/Documentation/GET/articlesearch.json.
+
+```{r, echo=T}
+nyt.path.data.frame <- data.frame(Path=NA,NYTUrl=NA)
+#URL formation
+#Base URL
+nyt.base.url <- "https://api.nytimes.com/svc/search/v2/articlesearch.json"
+
+#Attach API Key
+nyt.complete.url <- param_set(nyt.base.url, key = "api-key", value = "a8a7bea8b95f4ef986e504ec99287013")
+nyt.complete.url <- URLencode(nyt.complete.url)
+nyt.url.info <- "Generic Article Search"
+nyt.path.data.frame <- rbind(nyt.path.data.frame, c(nyt.url.info, nyt.complete.url))
+
+#Search query term. Search is performed on the article body, headline and byline looking for word apple.
+nyt.complete.url <- param_set(nyt.base.url, key = "q", value = "Apple")
+nyt.complete.url <- param_set(nyt.complete.url, key = "api-key", value = "a8a7bea8b95f4ef986e504ec99287013")
+nyt.complete.url <- URLencode(nyt.complete.url)
+nyt.url.info <- "Query Article Search with `q`"
+nyt.path.data.frame <- rbind(nyt.path.data.frame, c(nyt.url.info, nyt.complete.url))
+
+#The filter query results, search for word "Apple" and filter by "Court"
+nyt.complete.url <- param_set(nyt.base.url, key = "q", value = "Apple")
+nyt.complete.url <- param_set(nyt.complete.url, key = "fq", value = "Court")
+nyt.complete.url <- param_set(nyt.complete.url, key = "api-key", value = "a8a7bea8b95f4ef986e504ec99287013")
+nyt.complete.url <- URLencode(nyt.complete.url)
+nyt.url.info <- "Filter Query results with `fq`"
+nyt.path.data.frame <- rbind(nyt.path.data.frame, c(nyt.url.info, nyt.complete.url))
+
+#Add date conditions Format: YYYYMMDD
+nyt.complete.url <- param_set(nyt.base.url, key = "q", value = "Apple")
+nyt.complete.url <- param_set(nyt.complete.url, key = "fq", value = "Court")
+nyt.complete.url <- param_set(nyt.complete.url, key = "begin_date", value = "20160101")
+nyt.complete.url <- param_set(nyt.complete.url, key = "end_date", value = "20160131")
+nyt.complete.url <- param_set(nyt.complete.url, key = "api-key", value = "a8a7bea8b95f4ef986e504ec99287013")
+nyt.complete.url <- URLencode(nyt.complete.url)
+nyt.url.info <- "Filter Query results with `begin_date` and `end_date` `Format: YYYYMMDD`"
+nyt.path.data.frame <- rbind(nyt.path.data.frame, c(nyt.url.info, nyt.complete.url))
+
+#Sorting data
+nyt.complete.url <- param_set(nyt.base.url, key = "q", value = "Apple")
+nyt.complete.url <- param_set(nyt.complete.url, key = "fq", value = "Court")
+nyt.complete.url <- param_set(nyt.complete.url, key = "begin_date", value = "20160101")
+nyt.complete.url <- param_set(nyt.complete.url, key = "end_date", value = "20160131")
+nyt.complete.url <- param_set(nyt.complete.url, key = "sort", value = "newest")
+nyt.complete.url <- param_set(nyt.complete.url, key = "api-key", value = "a8a7bea8b95f4ef986e504ec99287013")
+nyt.complete.url <- URLencode(nyt.complete.url)
+nyt.url.info <- "Sort Query results with `sort` `newest or oldest`"
+nyt.path.data.frame <- rbind(nyt.path.data.frame, c(nyt.url.info, nyt.complete.url))
+
+nyt.path.data.frame <- na.omit(nyt.path.data.frame)
+row.names(nyt.path.data.frame) <- NULL
+
+kable(nyt.path.data.frame, format="pandoc", align="l", col.names = c("Path","NYTUrl"), row.names = NA,caption = "Sample list of URL's for *_NYTimes.com Article Search API_*")
+```
+
+####Data extraction and storage
+Following code extracts JSON data using **_Most Popular API_** and stores into R data frames namely `mostemailed.data`, `mostshared.data` and `mostviewed.data`.
+
+```{r, echo=T}
+#Extracting data using Most Popular API for World 7 days path
+most<-c("mostemailed","mostshared","mostviewed")
+nyt.base.url <- "https://api.nytimes.com/svc/mostpopular/v2/mostpath/World/7.json"
+
+for (i in 1:length(most)){
+  #First set of results
+  nyt.complete.url <- str_replace(nyt.base.url, pattern = "mostpath", replacement = most[i])
+  nyt.complete.url <- param_set(nyt.complete.url, key = "api-key", value = "a8a7bea8b95f4ef986e504ec99287013")
+  nyt.complete.url <- URLencode(nyt.complete.url)
+  nyt.raw.data <- fromJSON(nyt.complete.url)
+
+  if (i==1){
+    mostemailed.data <- nyt.raw.data$results
+  }
+  else if(i==2){
+    mostshared.data <- nyt.raw.data$results
+  }
+  else{
+    mostviewed.data <- nyt.raw.data$results
+  }
+}
+
+```
+
+Following code extracts JSON data using **_Article Search API_** and stores into R data frames namely `nyt.article.data`. Query extracts articles containing words `Apple` and `Court` between `01/01/2016` and `01/31/2016` ordered by newest.
+
+```{r, echo=T}
+
+nyt.base.url <- "https://api.nytimes.com/svc/search/v2/articlesearch.json"
+
+nyt.complete.url <- param_set(nyt.base.url, key = "q", value = '"Apple"')
+nyt.complete.url <- param_set(nyt.complete.url, key = "fq", value = '"Court"')
+nyt.complete.url <- param_set(nyt.complete.url, key = "begin_date", value = "20160101")
+nyt.complete.url <- param_set(nyt.complete.url, key = "end_date", value = "20160131")
+nyt.complete.url <- param_set(nyt.complete.url, key = "sort", value = "newest")
+nyt.complete.url <- param_set(nyt.complete.url, key = "api-key", value = "a8a7bea8b95f4ef986e504ec99287013")
+nyt.complete.url <- URLencode(nyt.complete.url)
+nyt.raw.data <- fromJSON(nyt.complete.url)
+
+nyt.article.data <- nyt.raw.data$response$docs
+row.names(nyt.article.data) <- NULL
+
+nyt.article.data %>% select(source, snippet) %>% 
+kable(format="pandoc", align="l", col.names = c("Source","Snippet"), row.names = NA,caption = "*_Sample List of Articles containing words `Apple` and `Court`_*")
+
+```
+
+####Data analysis
+```{r, echo=T}
+nyt.most.common.data <- mostemailed.data %>% 
+  inner_join(mostshared.data, by = "title") %>% 
+  inner_join(mostviewed.data, by = "title") %>%
+  select (title, total_shares, views)
+
+kable(nyt.most.common.data$title, format="pandoc", align="l", col.names = c("Title"), row.names = NA,caption = "List of Titles that were Most Viewed, Shared and Emailed")
+
+
+popular.topic <- unlist(mostemailed.data$des_facet)
+email.topic <- data.frame(topic=popular.topic, stringsAsFactors = F)
+
+popular.topic <- unlist(mostshared.data$des_facet)
+shared.topic <- data.frame(topic=popular.topic, stringsAsFactors = F)
+
+popular.topic <- unlist(mostviewed.data$des_facet)
+viewed.topic <- data.frame(topic=popular.topic, stringsAsFactors = F)
+
+mostpopular.topic <- rbind(email.topic, shared.topic, viewed.topic)
+
+popular.topic.summary <- mostpopular.topic %>% group_by(topic) %>% tally() %>% filter(topic != "") %>% arrange(desc(n)) %>% mutate(id=row_number()) %>%  filter(n > 1) %>% select(topic,n)
+
+ggplot(data=popular.topic.summary, aes(x=topic, y=n)) +
+  geom_bar(stat="identity") + labs(x="Topic", y="Number of Times", title = "Topics refered more than once") + coord_flip()
+```
+
+
+References: http://developer.nytimes.com
